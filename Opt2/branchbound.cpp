@@ -45,8 +45,8 @@ bool BranchBound::solve(double low, double &opt, std::vector<ElementType> &vars)
 			delete curSimplex;
 			lowBound = targetVal;
 			candicateVar = varval;
-			cout << lowBound << endl;}
-		
+			cout << lowBound << endl;
+		}		
 		else
 		{
 			double b = varval[noIntIndex];

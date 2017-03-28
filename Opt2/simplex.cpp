@@ -174,8 +174,9 @@ int DualSimplex::findPivotRow()
 	for (int i = 1; i < num_row; i++)
 	{
 		double val = matrix[i][0];
-		if (abs(round(val) - val) < 1e-8)
-			matrix[i][0] = round(val);
+		//// accuracy
+		//if (abs(round(val) - val) < 1e-8)
+		//	matrix[i][0] = round(val);
 		if (matrix[i][0] < lowest)
 		{
 			lowest = matrix[i][0];
@@ -302,3 +303,192 @@ bool DualSimplex::solveMinProblemWithDual(double &best, vector<ElementType>& var
 	}
 	return flag;
 }
+
+// get float part of the non-integeral element
+ElementType DualSimplex::getFloatPart(ElementType element)
+{
+	// check accuracy firstly
+	return abs(element - round(element)) > accuracy ? (element - floor(element)) : 0;
+}
+
+// find non-int element in b column(the first column)
+// prefer the one near to 0.5
+int DualSimplex::getNonIntegralB()
+{
+	// find nearest float part
+	ElementType nearest = 0.5;
+	ElementType nowB, delta;
+	int rowIndex = -1;
+	// satrt from row with b value
+	for (int i = 1; i < this->num_row; i++)
+	{
+		nowB = getFloatPart(this->matrix[i][0]);
+		delta = abs(0.5 - nowB);
+		if (delta < nearest)
+		{
+			nearest = delta;
+			rowIndex = i;
+		}
+	}
+
+	return rowIndex;
+}
+// calculate the new constraints of cutting plane
+void DualSimplex::getConstraint(int rowIndex, vector<ElementType>& constraint)
+{
+	// b value(negative)
+	ElementType floatB = getFloatPart(this->matrix[rowIndex][0]);
+	constraint.push_back(-1 * floatB);
+
+	ElementType floatPart;
+	int sign;
+	// calculate opssite sign * float part for each variable
+	for (int j = 1; j < this->num_col; j++)
+	{
+		floatPart = getFloatPart(this->matrix[rowIndex][j]);
+		if (floatPart == 0)
+		{
+			constraint.push_back(0);
+			continue;
+		}
+		// calculate the opposite sign
+		sign = this->matrix[rowIndex][j] > 0 ? -1 : 1;
+		constraint.push_back(sign * floatPart);
+	}
+
+}
+
+// add new constraint to dualSimplex by finding the non-integeral b value
+DualSimplex::DualSimplex(const DualSimplex &oldSimplex, bool& hasFound)
+{
+	// get non integeral b value
+	int rowIndex = this->getNonIntegralB();
+	if (rowIndex == -1)
+	{
+		hasFound = false;
+		return;
+	}
+
+	hasFound = true;
+	// get the new constraint
+	vector<ElementType> constraint;
+	this->getConstraint(rowIndex, constraint);
+
+	num_row = oldSimplex.num_row + 1;
+	num_variable = oldSimplex.num_variable;
+	num_col = oldSimplex.num_col + 1;
+	int lastRow = num_row - 1;
+	int lastCol = num_col - 1;
+
+	// ask for space
+	matrix = new ElementType*[num_row];
+	for (int i = 0; i < num_row; i++)
+	{
+		matrix[i] = new ElementType[num_col];
+	}
+	// copy the old matrix
+	for (int i = 0; i < lastRow; i++)
+	{
+		for (int j = 0; j < lastCol; j++)
+		{
+			matrix[i][j] = oldSimplex.matrix[i][j];
+		}
+	}
+
+	// add the last row and corresponding relaxation
+	// last col is 0
+	for (int i = 0; i < lastRow; i++)
+	{
+		matrix[i][lastCol] = 0;//relax
+	}
+	// last row is decided by constraint
+	for (int i = 0; i < lastCol; i++)
+	{
+		matrix[lastRow][i] = constraint[i];
+	}
+	matrix[lastRow][lastCol] = 1; //relax
+
+	// copy basic variable
+	bv = oldSimplex.bv;
+	bv.push_back(lastCol - 1);
+
+	////基变量冲突吗？impossible
+	//int totalBv = bv.size();
+	//for (int i = 0; i < totalBv; i++)
+	//{
+	//	if (bv[i] == varIndex)
+	//	{
+	//		//有冲突  把约束的相应变量消除
+	//		if (less)
+	//			for (int j = 0; j < num_col; j++)
+	//				matrix[lastRow][j] -= matrix[i + 1][j];
+	//		else
+	//			for (int j = 0; j < num_col; j++)
+	//				matrix[lastRow][j] += matrix[i + 1][j];
+	//		break;
+	//	}
+	//}
+
+}
+
+
+bool DualSimplex::updateSimplex()
+{
+	// get non integeral b value
+	int rowIndex = this->getNonIntegralB();
+	if (rowIndex == -1)
+	{
+		return false;
+	}
+
+	// get the new constraint
+	vector<ElementType> constraint;
+	this->getConstraint(rowIndex, constraint);
+
+	int newRow = num_row + 1;
+	int newCol = num_col + 1;
+	// get new matrix
+	// ask for space
+	ElementType ** tempMatrix = new ElementType*[newRow];
+	for (int i = 0; i < newRow; i++)
+	{
+		tempMatrix[i] = new ElementType[newCol + 1];
+	}
+	// copy the old matrix
+	for (int i = 0; i < num_row; i++)
+	{
+		for (int j = 0; j < num_col; j++)
+		{
+			tempMatrix[i][j] = matrix[i][j];
+		}
+	}
+	// add the last row and corresponding relaxation
+	// last col is 0
+	for (int i = 0; i < num_row; i++)
+	{
+		tempMatrix[i][num_col] = 0;//relax
+	}
+	// last row is decided by constraint
+	for (int i = 0; i < num_col; i++)
+	{
+		tempMatrix[num_row][i] = constraint[i];
+	}
+	tempMatrix[num_row][num_col] = 1; //relaxation
+
+	// update basic variable
+	bv.push_back(num_col - 1);
+	// update the matrix
+	clearOldMatrix();
+	matrix = tempMatrix;
+	// update row and col
+	num_row = newRow;
+	num_col = newCol;
+
+	return true;
+}
+
+//// add new constraint to the old simplex
+//bool DualSimplex::updateSimplex(DualSimplex &newSimplex, vector<ElementType>& constraint)
+//{
+//
+//}

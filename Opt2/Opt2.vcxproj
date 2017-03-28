@@ -88,11 +88,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="branchbound.cpp" />
+    <ClCompile Include="cutplane.cpp" />
     <ClCompile Include="simplex.cpp" />
     <ClCompile Include="源.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="branchbound.h" />
+    <ClInclude Include="cutplane.h" />
     <ClInclude Include="simplex.h" />
     <ClInclude Include="util.h" />
   </ItemGroup>

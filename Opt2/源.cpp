@@ -5,9 +5,10 @@
 #include<unordered_map>
 #include<ctime>
 #include<iomanip>
+#include<time.h>
 
 #include "simplex.h"
-#include "branchbound.h"
+#include "cutplane.h"
 
 using namespace std;
 
@@ -73,6 +74,7 @@ void makeCons(char *path, int &totalRow, int &totalCol, int &num_edge, int &lowb
 	int sCost;
 	fin >> sCost;
 
+	// calculate the low bound based on server cost and consumer number
 	lowbound = sCost * cCnt;
 
 	//内部网络
@@ -169,26 +171,43 @@ void makeCons(char *path, int &totalRow, int &totalCol, int &num_edge, int &lowb
 
 int main()
 {
+
+	clock_t start = clock();
 	int row, col, num_edge, lowbound;
 	ElementType **matrix = NULL;
-	makeCons("case0.txt", row, col, num_edge, lowbound, matrix);
+	makeCons("graph.txt", row, col, num_edge, lowbound, matrix);
 
 	//算法开始
-	BranchBound branchBound(row, col, num_edge, matrix);
+	/*BranchBound branchBound(row, col, num_edge, matrix);
 	double optimized;
 	vector<ElementType> variables;
-	if (!branchBound.solve(-lowbound-1, optimized, variables))
+	if (!branchBound.solve(-lowbound, optimized, variables))
 	{
 		cout << "can't find best" << endl;
+		cout << -lowbound << endl;
 		return 0;
 	}
+	cout << "optimization value is " << optimized << endl;*/
+
+	CutPlane cutPlane(row, col, matrix);
+	double optimized;
+	vector<ElementType> variables;
+	cutPlane.solve(optimized, variables);
+
 	cout << "optimization value is " << optimized << endl;
-	cout << "variables is " << endl;
-	for (int i = 0; i < variables.size(); i++)
-	{
-		cout << setw(15) << variables[i];
-	}
-	cout << endl;
+	cout << "low bound is " << lowbound << endl;
+
+
+	//cout << "variables is " << endl;
+	//for (int i = 0; i < variables.size(); i++)
+	//{
+	//	cout << setw(15) << variables[i];
+	//}
+	//cout << endl;
+
+	clock_t end = clock();
+	double cost_time = (double)(end - start) / CLOCKS_PER_SEC;
+	cout <<  cost_time<< endl;
 
 	return 0;
 }
